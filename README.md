@@ -16,6 +16,7 @@ Part of the [VaultPass](#related-repositories) ecosystem: native iOS, Android, a
 - [Getting Started](#getting-started)
 - [Configuration](#configuration)
 - [Running Tests](#running-tests)
+- [Client Integration](#client-integration)
 - [Related Repositories](#related-repositories)
 - [License](#license)
 
@@ -525,7 +526,7 @@ All incoming entries in a single sync request are processed within a database tr
 
 ```bash
 # Clone the repository
-git clone https://github.com/vaultpass/vaultpass-go.git
+git clone https://github.com/zumrywahid/vaultpass-go.git
 cd vaultpass-go
 
 # Install dependencies
@@ -631,16 +632,64 @@ go test -cover ./...
 | `service` | 12 | Input validation, base64 encoding roundtrip, default handling, empty state |
 | `repository` | 3 | Initialization, error sentinels, duplicate detection |
 
+## Client Integration
+
+This backend serves as the sync layer for native VaultPass clients. Each client is a standalone app that works fully offline — the backend is only needed for cross-device sync.
+
+```
+┌──────────────────────┐     ┌──────────────────────┐     ┌──────────────────────┐
+│   VaultPass iOS      │     │  VaultPass Android    │     │  VaultPass Web       │
+│   Swift / SwiftUI    │     │  Kotlin / Compose     │     │  Next.js             │
+│                      │     │                       │     │                      │
+│  ┌────────────────┐  │     │  ┌─────────────────┐  │     │  ┌────────────────┐  │
+│  │ Keychain       │  │     │  │ Android Keystore│  │     │  │ WebCrypto API  │  │
+│  │ FaceID/TouchID │  │     │  │ BiometricPrompt │  │     │  │                │  │
+│  │ AES-256-GCM    │  │     │  │ AES-256-GCM     │  │     │  │ AES-256-GCM    │  │
+│  │ Argon2id       │  │     │  │ Argon2id        │  │     │  │ Argon2id       │  │
+│  └───────┬────────┘  │     │  └────────┬────────┘  │     │  └───────┬────────┘  │
+│          │           │     │           │            │     │          │           │
+│  Encrypt locally     │     │  Encrypt locally      │     │  Encrypt locally     │
+│  before sending      │     │  before sending       │     │  before sending      │
+└──────────┬───────────┘     └───────────┬────────────┘     └──────────┬───────────┘
+           │                             │                             │
+           │    Encrypted blobs only     │     Encrypted blobs only    │
+           │    (HTTPS + JWT auth)       │     (HTTPS + JWT auth)      │
+           ▼                             ▼                             ▼
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                        VaultPass Go Backend (this repo)                          │
+│                                                                                  │
+│   /api/v1/auth/register    Register with email + auth key (Argon2id hashed)      │
+│   /api/v1/auth/login       Authenticate and receive JWT                          │
+│   /api/v1/vault/sync       Delta sync — send local changes, receive remote       │
+│   /api/v1/vault            CRUD encrypted vault entries                           │
+│   /api/v1/generate         Server-side CSPRNG password generation                │
+│                                                                                  │
+│   The server NEVER sees plaintext passwords, URLs, usernames, or notes.          │
+│   All vault data arrives pre-encrypted. The server stores and syncs opaque       │
+│   blobs using LWW conflict resolution with monotonic version numbers.            │
+└──────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### How Clients Use This Backend
+
+1. **Registration/Login** — Client derives an auth key from the master password using Argon2id and sends it to `/api/v1/auth/register` or `/login`. The server hashes this auth key again with Argon2id before storing it.
+
+2. **Vault Encryption** — All encryption happens on the client. Each vault entry is encrypted with AES-256-GCM using a key derived from the master password. The server only stores the resulting opaque base64-encoded blobs.
+
+3. **Sync** — Clients call `POST /api/v1/vault/sync` with their local changes and `last_synced_at` timestamp. The server responds with any remote changes since that timestamp. Conflicts are resolved by highest version number (Last-Write-Wins).
+
+4. **Offline-First** — Clients maintain a complete local vault (SQLite/Room on Android, SwiftData on iOS). The backend is optional — the app is fully functional without network access.
+
 ## Related Repositories
 
-VaultPass is built natively for each platform — not cross-compiled. Each client implements the same E2E encryption protocol:
+VaultPass is built natively for each platform — not cross-compiled. Each client implements the same E2E encryption protocol and syncs through this Go backend.
 
 | Repository | Stack | Description |
 |------------|-------|-------------|
-| **vaultpass-go** (this repo) | Go | Backend API — zero-knowledge sync service |
-| **vaultpass-ios** | Swift / SwiftUI | iOS client — Keychain, FaceID, AutoFill |
-| **vaultpass-android** | Kotlin / Jetpack Compose | Android client — Keystore, Biometrics, Autofill |
-| **vaultpass-nextjs** | Next.js | Web dashboard — WebCrypto API |
+| [**vaultpass-go**](https://github.com/zumrywahid/vaultpass-go) (this repo) | Go | Backend API — zero-knowledge sync service |
+| [**vaultpass-ios**](https://github.com/zumrywahid/vaultpass-ios) | Swift / SwiftUI | iOS client — Keychain, FaceID, AutoFill |
+| [**vaultpass-android**](https://github.com/zumrywahid/vaultpass-android) | Kotlin / Jetpack Compose | Android client — Keystore, Biometrics, Autofill |
+| **vaultpass-nextjs** | Next.js | Web dashboard — WebCrypto API (coming soon) |
 
 ## License
 
