@@ -18,6 +18,7 @@ Part of the [VaultPass](#related-repositories) ecosystem: native iOS, Android, a
 - [Running Tests](#running-tests)
 - [Client Integration](#client-integration)
 - [Related Repositories](#related-repositories)
+- [Author](#author)
 - [License](#license)
 
 ## Architecture
@@ -690,6 +691,12 @@ VaultPass is built natively for each platform — not cross-compiled. Each clien
 | [**vaultpass-ios**](https://github.com/zumrywahid/vaultpass-ios) | Swift / SwiftUI | iOS client — Keychain, FaceID, AutoFill |
 | [**vaultpass-android**](https://github.com/zumrywahid/vaultpass-android) | Kotlin / Jetpack Compose | Android client — Keystore, Biometrics, Autofill |
 | **vaultpass-nextjs** | Next.js | Web dashboard — WebCrypto API (coming soon) |
+
+## Author
+
+**Zumry Wahid** — [github.com/zumrywahid](https://github.com/zumrywahid)
+
+VaultPass is a portfolio project demonstrating native platform mastery, security/crypto domain knowledge, and Go backend development. Each platform — iOS, Android, and web — is built natively to showcase deep OS integration rather than cross-platform abstraction.
 
 ## License
 
